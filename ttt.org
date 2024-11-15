@@ -1,18 +1,14 @@
 #+title: Test Time Training
 #+author: Adam Neeley
-This is my analysis of the test time training (TTT) paper found at
-https://ekinakyurek.github.io/papers/ttt.pdf.
-
-The git repository that contains the ideas found in the paper is located at https://github.com/ekinakyurek/marc.
+Cursory analysis of a [[https://ekinakyurek.github.io/papers/ttt.pdf][test time training paper]] and the corresponding [[https://github.com/ekinakyurek/marc][python code]].
 * Introduction
-The core idea of /test time training/ (TTT) is to temporarily finetune an LLM based on previously unseen input data.
-This approach has /doubled the accuracy/ of fully-neural approaches from 25% to 53% accuracy.
-When combined with /program synthesis/, this increases to 62%.
-62% accuracy is roughly average human performance, but it falls short of expert human performance (93%).
+The core idea of /test time training/ (TTT) is finetuning an LM upon encountering previously-unseen input data.
 ** Definition
-#+begin_quote
-*Test time training*: updating model parameters temporarily during inference using a loss derived from input data.
-#+end_quote
+- Test time training :: updating model parameters temporarily during inference using a loss derived from input data.
+** Results
++ Over /double/ the accuracy of *fully-neural* approaches (from 25% to 53%).
++ When combined with *program synthesis*, this increases to 62%.
+For context, 62% accuracy is roughly average human performance; expert human performance is about 93%.
 ** Crucial parts
 1. *Initial finetuning* on similar tasks generated at test time.
 2. *Leave-one-out* generation strategy for constructing test-time dataset.
@@ -21,15 +17,60 @@ When combined with /program synthesis/, this increases to 62%.
 ** Two methods
 The paper presents two main categories for ARC solvers:
 *** Program Synthesis
-1. Find transformation $f$.
+1. Find (delta) transformation $f: G \to G$.
 2. Apply to test example.
 *** Fully Neural
 1. Directly predict the test output, only implicitly reasoning of the underlying transformation.
+* Data augmentation
+These are methods used to increase the amount of training from about 400 tasks to 60,000 tasks.
+** Leave-one-out
+Given a set of /N/ grid pairs from the training pairs of a task, the *leave-one-out* strategy involves generating an additional /N/ *synthetic tasks*--each of which tests the transformation on the /N-1/ remaining training pairs.
+** Invertible transformations
+Their TTT model uses invertible transformations such as
++ rotation
++ scaling
++ flip
++ color permutation
++ example permutation
+to increase the relatively small set of given and synthetic tasks to over $N^2$ tasks.
+* Prompts
+The way the model works is basically to send the LM strategically worded prompts instructing it to do the heavy lifting. It looks something like this:
+** Describing a task
+#+begin_src
+You are an intelligent agent that can induce task descriptions from examples. For Category, please
+*do not* use generic terms like Transformation, Pattern Recognition.
+—————-
+Task: {stringified task inputs and outputs}
+LARC Description: {description of the task-1 from LARC dataset}
+Good Description: {hierarchical description}
+—————-
+[truncated]
+—————-
+Task: {stringified task inputs and outputs for task-K}
+LARC Description: {description of the task-K from LARC dataset}
+Good Description: {hierarchical description}
+—————-
+Task: {stringified task inputs and outputs for query task}
+LARC Description: {description of the query task from LARC dataset}
+#+end_src
+** Generating additional tasks
+#+begin_src
+You are a problem generator on 2D grids of colors. Here are some examples of such transformations,
+please follow the format:
+—————-
+Example: {description of the generator function-1}
+Script: {generator function-1}
+—————-
+[truncated]
+—————-
+Example: {description of the generator function-K}
+Script: {generator function-K}
+Please generate more and make sure they are different:
+#+end_src
+* Limitations
+** Time
+Even if the current TTT implementation worked as intended, it's large computational requirements preclude it from participating in the ARC challenge.
+** Leakage
+It is not clear whether the public availablity of the ARC dataset has artificially enhanced the performance of this model.
 * Conclusion
-1. The paper presents a novel approach to TTT that leverages the strengths of LLMs and pre-trained models.
-2. TTT is not AGI.
-** Citation
-@article{ekinakyurek2023ttt,
-  title={Test Time Training for Large Language Models}, References
-#+begin_bibliography:
-#+end_bibliography:
+I don't claim to /fully/ understand the mechanisms that underly the TTT model, but it does seem to present some interesting ideas regarding data augmentation (the /leave-one-out/ strategy and /invertible transformations/), novel use of LMs, and I found its codebase to be mostly straightforward and illuminating. The paper also introduces some useful terminology such as "fully-neural" and "program synthesis."
