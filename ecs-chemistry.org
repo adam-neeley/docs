@@ -1,0 +1,111 @@
+* How to Use ECS for a Chemistry Lab Simulator
+
+** Core ECS Structure
+- *Entities*: Unique IDs representing objects (e.g., beakers, burners, chemicals).
+- *Components*: Data containers (e.g., chemical properties, equipment states).
+- *Systems*: Logic to process entities with specific component combinations.
+
+** Components for Chemistry Processes
+| Component       | Properties                                                          |
+|-----------------+---------------------------------------------------------------------|
+| Transform       | Position, rotation, scale (for 3D visualization)                    |
+| Volume          | currentVolume, maxVolume (container capacity)                       |
+| ChemicalMixture | List of chemicals with concentration, phase, boiling point, density |
+| Temperature     | currentTemp, melting/boiling points                                 |
+| HeatSource      | outputTemp, isActive, fuelLevel (burners)                           |
+| Filter          | poreSize, efficiency, isClogged (filters)                           |
+| Reaction        | reactants, products, catalyst, reactionRate (redox)                 |
+| PhaseChange     | targetPhase (solid/liquid/gas), energyPerTick                       |
+
+** Systems for Chemical Processes
+*** Fractionation
+- *System*: FractionationSystem
+- *Components*: ChemicalMixture, Temperature, FractionationColumn
+- *Logic*:
+  1. Separate chemicals based on boiling points.
+  2. Transfer vaporized components to a condenser.
+
+*** Decontamination
+- *System*: DecontaminationSystem
+- *Components*: ChemicalMixture, Filter, Contaminant
+- *Logic*:
+  1. Reduce contaminants via filtration/neutralization.
+
+*** Distillation
+- *System*: DistillationSystem
+- *Components*: HeatSource, ChemicalMixture, CoolingComponent
+- *Logic*:
+  1. Heat mixture to boiling points.
+  2. Condense vapor and collect distillate.
+
+*** Filtration
+- *System*: FiltrationSystem
+- *Components*: ChemicalMixture, Filter, SolidComponent
+- *Logic*:
+  1. Separate solids from liquids using pore size/clog state.
+
+*** Oxidation/Reduction
+- *System*: ReactionSystem
+- *Components*: ChemicalMixture, Reaction, Catalyst
+- *Logic*:
+  1. Trigger redox reactions when conditions are met.
+
+** Example Entity Setup
+- *Beaker*:
+  - Components: Transform, Volume, ChemicalMixture, Temperature
+- *Bunsen Burner*:
+  - Components: HeatSource, Transform
+- *Filter Paper*:
+  - Components: Filter, Volume
+
+** System Execution Flow
+1. HeatingSystem → Updates temperatures of entities near heat sources.
+2. ReactionSystem → Processes oxidation/reduction reactions.
+3. DistillationSystem → Separates heated mixtures.
+4. FiltrationSystem → Filters solids from liquids.
+5. DecontaminationSystem → Removes contaminants.
+
+** Key Implementation Steps
+1. Component Initialization
+   - Attach components to entities (e.g., ChemicalMixture to beakers).
+2. System Queries
+   - Systems query entities by required components (e.g., HeatSource + ChemicalMixture).
+3. User Interaction
+   - Link entities via UI (e.g., placing a beaker on a burner).
+4. Data-Driven Chemistry
+   - Use lookup tables for chemical properties (boiling points, reactivity).
+
+** Optimization Tips
+- *Batch Processing*: Group entities by component combinations for cache efficiency.
+- *Event Triggers*: Update systems only when relevant changes occur.
+- *Spatial Partitioning*: Use grids/quadtrees for proximity checks (e.g., heat transfer).
+
+** Example Code Skeleton
+#+BEGIN_SRC python
+# Component Classes
+class ChemicalMixture:
+    def __init__(self):
+        self.chemicals = []  # Format: [{id: "H2O", concentration: 0.5, phase: "liquid"}]
+
+class HeatSource:
+    def __init__(self):
+        self.output_temp = 300  # °C
+        self.is_active = False
+
+# System Classes
+class DistillationSystem:
+    def update(self, entities):
+        for entity in entities:
+            if entity.has(ChemicalMixture) and entity.has(HeatSource):
+                mixture = entity.get(ChemicalMixture)
+                heater = entity.get(HeatSource)
+                if heater.is_active:
+                    for chem in mixture.chemicals:
+                        if chem.boiling_point <= mixture.temperature:
+                            self.vaporize(chem, entity)
+#+END_SRC
+
+** Challenges & Solutions
+- *Phase Transitions*: Track phase changes in ChemicalMixture and update rendering.
+- *Scalability*: Use sparse sets for component storage to handle 10k+ entities.
+- *Realism*: Integrate formulas like Clausius-Clapeyron for boiling points.
